@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>My first canvas thingy</title>
+    <link rel="stylesheet" href="http://code.jquery.com/ui/1.10.4/themes/smoothness/jquery-ui.css">
+    <script src="jquery-2.1.0.min.js"></script>
+    <script src="kinetic-v5.0.1.min.js"></script>
+    <!-- <script src="jquery-ui-1.10.4/jquery-1.10.2.js"></script> -->
+    <!-- <script src="jquery-ui-1.10.4/ui/jquery-ui.js"></script> -->
+    <script src="http://code.jquery.com/jquery-1.10.2.js"></script>
+    <script src="http://code.jquery.com/ui/1.10.4/jquery-ui.js"></script>
+    <script>
+      var time_list = [];
+      var lyric_list = [];
+      var cur_lyric = 0;
+
+      function update() { 
+         var curTime = $("#song")[0].currentTime;
+         if ((cur_lyric < lyric_list.length - 1 ) && (curTime > time_list[cur_lyric+1])) {
+             cur_lyric++;
+         }
+         if (cur_lyric < lyric_list.length) {
+             simpleText.setText(lyric_list[cur_lyric]);
+             simpleText3.setText(lyric_list[cur_lyric]);
+         }
+
+         if (cur_lyric < lyric_list.length - 1 ) {
+             progress = (curTime - time_list[cur_lyric]) / (time_list[cur_lyric+1] - time_list[cur_lyric]);
+         } 
+         else { progress = 1.0}
+         group.setClipWidth(simpleText.width()*progress+0.001);
+         layer.draw();
+         setTimeout(update, 1000.0/60);      
+      }
+
+      function build_lyric_db(lyrics) {
+          var lines = lyrics.split("\n");
+
+          $.each(lines, function(n, elem) {
+              time_and_word_match = elem.match(/^((?:\[\d{2}:\d{2}(?:[.:]\d+)?\])+)(.+)/);
+              if (time_and_word_match != null) {
+                  time_stamps = time_and_word_match[1];
+                  lyrics = time_and_word_match[2];
+                  //console.log(lyrics);
+
+                  // split out into word/reading pairs and text with no readings
+                  word_array =  lyrics.match(/({[^}]+}{2}|.{[^}]+}|[^{}]+(?![{}]))/g);
+
+                  var plain_string = "";
+                  $.each(word_array, function(n2, word) {
+                      plain_term = word;
+                      reading = "";
+                      word_reading_match = word.match(/^{?([^{}]+)}?{(.+)}$/);
+                      if (word_reading_match != null) {
+                          plain_term = word_reading_match[1];
+                          reading = word_reading_match[2];
+                      }
+                      plain_string += plain_term;
+                  });
+
+	          // match just first one for now
+	          time_stamp_array = time_stamps.match(/(\d+):(\d+)[:.](\d+)/);
+                  if (time_stamp_array != null) {
+                      min = time_stamp_array[1];
+		      sec = time_stamp_array[2];
+		      hundredths = time_stamp_array[3];
+                      time = parseInt(min) * 60 + parseInt(sec) + parseInt(hundredths) / 100.0;
+	              time_list.push(time);
+                  }
+                  lyric_list.push(plain_string);
+              }
+          });
+      }
+
+      $(document).ready(function(){
+      layer.draw();
+
+      $.get('./da_feng_chui.txt‎', function(data) {
+          var lines = data.split("\n");
+
+          $.each(lines, function(n, elem) {
+              console.log(elem);
+          });
+      });
+      
+
+      $("#song").on('playing', function() { console.log('Playing...')});
+      $("#ParseLyrics").on('click', function()
+      { 
+          build_lyric_db($("#lyrics")[0].value);
+      });
+      update();
+
+      });
+      // onplaying="console.log('Playing...')" onpause="console.log('Paused');" onended="console.log('Done');" onseeked="console.log('New time is: ' + $('#song')[0].currentTime);"
+</script>
+  </head>
+  <body lang="zh-TW">
+    <h1>I'm totally going to put something useful here.</h1>
+    <h2>I promise.</h2>
+    <div id="percent"></div>
+    <hr />
+    <div id="container" style="background-color:#444444"></div>
+    <script defer="defer">
+      var stage = new Kinetic.Stage({
+      container: 'container',
+      width: 1600,
+      height: 220
+      });
+      var layer = new Kinetic.Layer();
+
+      var simpleText = new Kinetic.Text({
+      x: 0,
+      y: 60,
+      align: 'right',
+      text: '這只是一個測試。',
+      fontFamily: 'Microsoft YaHei',
+      fontSize: 70,
+      fontStyle: 'bold',
+      stroke: 'black',
+      fill: 'white',
+      });
+
+      simpleText.offsetX(0);
+
+      // add the shapes to the layer
+      var simpleText3  = simpleText.clone();
+      simpleText3.setStroke('white');
+      simpleText3.setFill('#0044ff');
+
+      // TODO: Figure out why ascenders and descenders require a fudge factor
+      //       for the height and offset
+      //       Probably also want to have an option to turn off outlining
+      //       or do my own "in-house" algo, since languages with connectors
+      //       between characters don't quite look right
+      var group = new Kinetic.Group({
+        clip: {
+          x: 0, 
+          y: 60 - 10, 
+          width: simpleText.width()*0.60, 
+          height: simpleText.height()+20 
+      }});
+      group.add(simpleText3);
+
+      layer.add(simpleText);
+      layer.add(group);
+
+      var simpleText2  = simpleText.clone();
+      simpleText2.setText('明日');
+
+
+      var ashita_height = simpleText2.height();
+      var ashita_width = simpleText2.width();
+
+      var furigana = new Kinetic.Text({
+      x: ashita_width / 2,
+      y: 60 - ashita_height * 0.6,
+      text: 'あした',
+      fontSize: ashita_height * 0.6,
+      fontFamily: 'Sans',
+      stroke: 'white',
+      //strokeWidth: simpleText.getStrokeWidth()*0.6,
+      fill: '#0044ff',
+      });
+      furigana.offsetX(furigana.width() / 2);
+      layer.add(furigana);
+      stage.add(layer);
+
+    </script>
+    <hr />
+    <audio controls id="song">
+      <source src="watm.mp3" type="audio/mpeg" />
+      Your browser does not support this audio format.
+    </audio>
+    <br />
+    <textarea id="lyrics" rows="4" cols="50">Lyrics go here</textarea>
+    <button id="ParseLyrics">Parse</button> 
+  </body>
+</html>
