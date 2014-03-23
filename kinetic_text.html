@@ -4,29 +4,45 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <title>My first canvas thingy</title>
     <link rel="stylesheet" href="http://code.jquery.com/ui/1.10.4/themes/smoothness/jquery-ui.css">
-    <script src="jquery-2.1.0.min.js"></script>
-    <script src="kinetic-v5.0.1.min.js"></script>
-    <!-- <script src="jquery-ui-1.10.4/jquery-1.10.2.js"></script> -->
-    <!-- <script src="jquery-ui-1.10.4/ui/jquery-ui.js"></script> -->
-    <script src="http://code.jquery.com/jquery-1.10.2.js"></script>
+    <script src="http://code.jquery.com/jquery-2.1.0.min.js"></script>
+    <script src="../kinetic-v5.0.1.min.js"></script>
     <script src="http://code.jquery.com/ui/1.10.4/jquery-ui.js"></script>
     <script>
-      var time_list = [];
       var lyric_list = [];
       var cur_lyric = 0;
+      function render_line(lyric_object) { 
+         simpleText.setText(lyric_object.line);
+         simpleText3.setText(lyric_object.line);
+         reading_group.destroyChildren();
+          $.each(lyric_object.readings, function(n, elem) {
+              console.log(elem.reading + "(" + elem.left + " - " + elem.right + ")");
+              var readingText = furigana.clone();
+              readingText.setText(elem.reading);
+              var max_width = (elem.right-elem.left);
+              var padding = 10;
+              readingText.x(elem.left+(max_width)/2.0);
+              if ((readingText.width()+padding) > max_width) {
+                  readingText.scaleX((max_width-padding) / (readingText.width()));
+              }
+              readingText.offsetX(readingText.width() / 2);
+              reading_group.add(readingText);
+          });
+      }
 
       function update() { 
          var curTime = $("#song")[0].currentTime;
-         if ((cur_lyric < lyric_list.length - 1 ) && (curTime > time_list[cur_lyric+1])) {
-             cur_lyric++;
-         }
-         if (cur_lyric < lyric_list.length) {
-             simpleText.setText(lyric_list[cur_lyric]);
-             simpleText3.setText(lyric_list[cur_lyric]);
-         }
 
+         if ((cur_lyric < lyric_list.length - 1 ) && (curTime > lyric_list[cur_lyric+1].time)) {
+             cur_lyric++;
+
+             if (cur_lyric < lyric_list.length) {
+		render_line(lyric_list[cur_lyric]);
+               //  simpleText.setText(lyric_list[cur_lyric].line);
+               //  simpleText3.setText(lyric_list[cur_lyric].line);
+             }
+         }
          if (cur_lyric < lyric_list.length - 1 ) {
-             progress = (curTime - time_list[cur_lyric]) / (time_list[cur_lyric+1] - time_list[cur_lyric]);
+             progress = (curTime - lyric_list[cur_lyric].time) / (lyric_list[cur_lyric+1].time - lyric_list[cur_lyric].time);
          } 
          else { progress = 1.0}
          group.setClipWidth(simpleText.width()*progress+0.001);
@@ -48,29 +64,48 @@
                   word_array =  lyrics.match(/({[^}]+}{2}|.{[^}]+}|[^{}]+(?![{}]))/g);
 
                   var plain_string = "";
+	          var readings = []
+                  cache_text.setText(plain_string);
                   $.each(word_array, function(n2, word) {
-                      plain_term = word;
+                      var plain_term = word;
                       reading = "";
                       word_reading_match = word.match(/^{?([^{}]+)}?{(.+)}$/);
                       if (word_reading_match != null) {
                           plain_term = word_reading_match[1];
                           reading = word_reading_match[2];
                       }
+                      var left_bound = cache_text.getWidth();
+		      // fixes weird issue in Chromium with CJK full-width spaces
+		      plain_term = plain_term.replace("　", " ");
                       plain_string += plain_term;
+	              cache_text.setText(plain_string);
+                      var right_bound = cache_text.getWidth();
+                      if (reading != "") {
+                         readings.push({reading: reading, left: left_bound, right: right_bound});
+                      }
                   });
 
 	          // match just first one for now
-	          time_stamp_array = time_stamps.match(/(\d+):(\d+)[:.](\d+)/);
-                  if (time_stamp_array != null) {
-                      min = time_stamp_array[1];
-		      sec = time_stamp_array[2];
-		      hundredths = time_stamp_array[3];
-                      time = parseInt(min) * 60 + parseInt(sec) + parseInt(hundredths) / 100.0;
-	              time_list.push(time);
-                  }
-                  lyric_list.push(plain_string);
+		  var time_stamp_array = time_stamps.split('][');
+		  console.log(time_stamp_array);
+                  $.each(time_stamp_array, function(n2, stamp) {
+		      console.log(stamp);
+		      var time_stamp_re = stamp.match(/(\d+):(\d+)[:.](\d+)/);
+		      var lyric_object = {line: plain_string, readings: readings};
+                      if (time_stamp_re != null) {
+                          min = time_stamp_re[1];
+		          sec = time_stamp_re[2];
+		          hundredths = time_stamp_re[3];
+                          lyric_object.time = parseInt(min) * 60 + parseInt(sec) + parseInt(hundredths) / 100.0;
+		          lyric_list.push(lyric_object);
+                      }
+                  });
               }
           });
+          lyric_list.sort(function(a,b) { return a.time-b.time; });
+	  if (lyric_list.length > 0) {
+	      render_line(lyric_list[0]);
+          }
       }
 
       $(document).ready(function(){
@@ -96,7 +131,7 @@
       // onplaying="console.log('Playing...')" onpause="console.log('Paused');" onended="console.log('Done');" onseeked="console.log('New time is: ' + $('#song')[0].currentTime);"
 </script>
   </head>
-  <body lang="zh-TW">
+  <body lang="zh-CN">
     <h1>I'm totally going to put something useful here.</h1>
     <h2>I promise.</h2>
     <div id="percent"></div>
@@ -129,6 +164,8 @@
       simpleText3.setStroke('white');
       simpleText3.setFill('#0044ff');
 
+      var cache_text  = simpleText.clone();
+
       // TODO: Figure out why ascenders and descenders require a fudge factor
       //       for the height and offset
       //       Probably also want to have an option to turn off outlining
@@ -143,7 +180,10 @@
       }});
       group.add(simpleText3);
 
+      var reading_group = new Kinetic.Group();
+
       layer.add(simpleText);
+      layer.add(reading_group);
       layer.add(group);
 
       var simpleText2  = simpleText.clone();
@@ -153,24 +193,25 @@
       var ashita_height = simpleText2.height();
       var ashita_width = simpleText2.width();
 
+      var FURIGANA_SCALE = 0.5;
       var furigana = new Kinetic.Text({
       x: ashita_width / 2,
-      y: 60 - ashita_height * 0.6,
+      y: 60 - ashita_height * FURIGANA_SCALE,
       text: 'あした',
-      fontSize: ashita_height * 0.6,
-      fontFamily: 'Sans',
-      stroke: 'white',
-      //strokeWidth: simpleText.getStrokeWidth()*0.6,
-      fill: '#0044ff',
+      fontSize: ashita_height * FURIGANA_SCALE,
+      fontFamily: 'Microsoft YaHei',
+      fontStyle: 'bold',
+      stroke: 'black',
+      fill: '#efbf19',
       });
       furigana.offsetX(furigana.width() / 2);
-      layer.add(furigana);
+      <!-- layer.add(furigana); -->
       stage.add(layer);
 
     </script>
     <hr />
     <audio controls id="song">
-      <source src="watm.mp3" type="audio/mpeg" />
+      <source src="../da_feng_chui.mp3" type="audio/mpeg" />
       Your browser does not support this audio format.
     </audio>
     <br />
